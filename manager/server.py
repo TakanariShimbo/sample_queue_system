@@ -1,6 +1,6 @@
 import os
 import uuid
-import json
+import pickle
 
 import redis
 from fastapi import FastAPI, HTTPException
@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
-REDIS_IP_ADDRESS = os.getenv("REDIS_IP_ADDRESS")
-REDIS_PORT = os.getenv("REDIS_PORT")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
-FASTAPI_PORT = os.getenv("FASTAPI_PORT")
+REDIS_IP_ADDRESS = os.environ["REDIS_IP_ADDRESS"]
+REDIS_PORT = os.environ["REDIS_PORT"]
+REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
+FASTAPI_PORT = os.environ["FASTAPI_PORT"]
 
 HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
@@ -37,9 +37,7 @@ class JobResultResponse(BaseModel):
     result: list[float]
 
 
-r = redis.Redis(
-    host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD
-)
+r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
 def get_result_cache_name(job_id: str) -> str:
@@ -49,7 +47,7 @@ def get_result_cache_name(job_id: str) -> str:
 def add_task(queue_name: str, text: str) -> str:
     job_id = str(uuid.uuid4())
     job = {"job_id": job_id, "texts": text}
-    r.rpush(queue_name, json.dumps(job))
+    r.rpush(queue_name, pickle.dumps(job))
     return job_id
 
 
@@ -77,7 +75,7 @@ def get_job_status(job_id: str):
     result = r.get(result_key)
     if result:
         r.delete(result_key)
-        return {"job_id": job_id, "result": json.loads(result)}
+        return {"job_id": job_id, "result": pickle.loads(result)}
     else:
         raise HTTPException(status_code=404, detail="Job not found or still processing")
 

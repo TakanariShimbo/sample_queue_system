@@ -1,7 +1,7 @@
 import time
 import os
 from typing import Awaitable, Any
-import json
+import pickle
 import random
 
 import redis
@@ -9,16 +9,14 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
-REDIS_IP_ADDRESS = os.getenv("REDIS_IP_ADDRESS")
-REDIS_PORT = os.getenv("REDIS_PORT")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
+REDIS_IP_ADDRESS = os.environ["REDIS_IP_ADDRESS"]
+REDIS_PORT = os.environ["REDIS_PORT"]
+REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
 
 HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
 
-r = redis.Redis(
-    host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD
-)
+r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
 def get_result_cache_name(job_id: str) -> str:
@@ -38,11 +36,11 @@ def get_job():
 
 
 def process_job(job: Awaitable) -> dict[str, Any]:
-    job_data = json.loads(job.decode("utf-8"))
+    job_data = pickle.loads(job)
     result = [random.uniform(0, 1) for _ in range(1024)]
     time.sleep(5)
     result_key = get_result_cache_name(job_id=job_data["job_id"])
-    r.set(result_key, json.dumps(result))
+    r.set(result_key, pickle.dumps(result))
     print(f"Processing completed: {job_data}")
     return {"job_id": job_data["job_id"], "result": result}
 
