@@ -2,10 +2,11 @@ import os
 import uuid
 import pickle
 
-import redis
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
 from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException
+import redis
+
+from scheme import AddJobRequest, AddJobResponse, GetResultResponse
 
 
 load_dotenv()
@@ -20,58 +21,41 @@ LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
 app = FastAPI()
 
 
-class ProcessingData(BaseModel):
-    text: str
-
-
-class ProcessingRequest(BaseModel):
-    data: list[ProcessingData]
-
-
-class JobStatusResponse(BaseModel):
-    job_id: str
-
-
-class JobResultResponse(BaseModel):
-    job_id: str
-    result: list[float]
-
-
 r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
-def get_result_cache_name(job_id: str) -> str:
+def get_result_key(job_id: str) -> str:
     return f"result:{job_id}"
 
 
-def add_task(queue_name: str, text: str) -> str:
+def add_job(queue_name: str, text: str) -> str:
     job_id = str(uuid.uuid4())
     job = {"job_id": job_id, "texts": text}
     r.rpush(queue_name, pickle.dumps(job))
     return job_id
 
 
-@app.post("/high_priority", response_model=list[JobStatusResponse])
-def add_task_to_high_priority(request: ProcessingRequest):
-    jobs_response = []
-    for data in request.data:
-        job_id = add_task(queue_name=HIGH_PRIORITY_QUEUE_NAME, text=data.text)
-        jobs_response.append({"job_id": job_id})
-    return jobs_response
+@app.post("/add-job/high-priority", response_model=AddJobResponse)
+def add_job_as_high_priority(request: AddJobRequest):
+    response_data = []
+    for request_data in request.data:
+        job_id = add_job(queue_name=HIGH_PRIORITY_QUEUE_NAME, text=request_data.text)
+        response_data.append({"job_id": job_id})
+    return {"data": response_data}
 
 
-@app.post("/low_priority", response_model=list[JobStatusResponse])
-def add_task_to_low_priority(request: ProcessingRequest):
-    jobs_response = []
-    for data in request.data:
-        job_id = add_task(queue_name=LOW_PRIORITY_QUEUE_NAME, text=data.text)
-        jobs_response.append({"job_id": job_id})
-    return jobs_response
+@app.post("/add-job/low-priority", response_model=AddJobResponse)
+def add_job_as_low_priority(request: AddJobRequest):
+    response_data = []
+    for request_data in request.data:
+        job_id = add_job(queue_name=LOW_PRIORITY_QUEUE_NAME, text=request_data.text)
+        response_data.append({"job_id": job_id})
+    return {"data": response_data}
 
 
-@app.get("/status/{job_id}", response_model=JobResultResponse)
+@app.get("/get-result/{job_id}", response_model=GetResultResponse)
 def get_job_status(job_id: str):
-    result_key = get_result_cache_name(job_id=job_id)
+    result_key = get_result_key(job_id=job_id)
     result = r.get(result_key)
     if result:
         r.delete(result_key)

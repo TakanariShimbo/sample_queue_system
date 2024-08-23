@@ -1,9 +1,9 @@
-import time
 import os
+import time
 import threading
 
-import requests
 from dotenv import load_dotenv
+import requests
 
 
 load_dotenv()
@@ -17,14 +17,15 @@ def submit_embedding_request(texts: list[str]) -> list[str]:
         data.append({"text": text})
 
     response = requests.post(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/low_priority",
+        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/add-job/low-priority",
         json={"data": data},
     )
 
     if response.status_code == 200:
         job_ids = []
-        for res in response.json():
-            job_id = res["job_id"]
+        body = response.json()
+        for data in body["data"]:
+            job_id = data["job_id"]
             job_ids.append(job_id)
             print(f"Job submitted successfully. Job ID: {job_id}")
         return job_ids
@@ -34,7 +35,7 @@ def submit_embedding_request(texts: list[str]) -> list[str]:
 
 def get_job_result(job_id: str):
     response = requests.get(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/status/{job_id}",
+        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/get-result/{job_id}",
     )
 
     if response.status_code == 200:

@@ -1,11 +1,11 @@
-import time
 import os
-from typing import Awaitable, Any
 import pickle
 import random
+import time
+from typing import Any
 
-import redis
 from dotenv import load_dotenv
+import redis
 
 
 load_dotenv()
@@ -19,11 +19,18 @@ LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
 r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
-def get_result_cache_name(job_id: str) -> str:
+def get_result_key(job_id: str) -> str:
     return f"result:{job_id}"
 
 
-def get_job():
+def estimate_result(job_data: Any) -> Any:
+    result_key = get_result_key(job_id=job_data["job_id"])
+    time.sleep(5)
+    result = [random.uniform(0, 1) for _ in range(1024)]
+    return result_key, result
+
+
+def get_job() -> Any | None:
     high_priority_job = r.lpop(HIGH_PRIORITY_QUEUE_NAME)
     if high_priority_job:
         return high_priority_job
@@ -35,20 +42,17 @@ def get_job():
     return None
 
 
-def process_job(job: Awaitable) -> dict[str, Any]:
+def process_job(job: Any) -> None:
     job_data = pickle.loads(job)
-    result = [random.uniform(0, 1) for _ in range(1024)]
-    time.sleep(5)
-    result_key = get_result_cache_name(job_id=job_data["job_id"])
+    result_key, result = estimate_result(job_data=job_data)
     r.set(result_key, pickle.dumps(result))
-    print(f"Processing completed: {job_data}")
-    return {"job_id": job_data["job_id"], "result": result}
+    print(f"Processing completed: {job_data.job_id}")
 
 
 if __name__ == "__main__":
     while True:
         job = get_job()
-        if not job:
+        if job is None:
             continue
 
         process_job(job=job)
