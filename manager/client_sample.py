@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
-FASTAPI_IP_ADDRESS = os.getenv("FASTAPI_IP_ADDRESS")
-FASTAPI_PORT = os.getenv("FASTAPI_PORT")
+FASTAPI_IP_ADDRESS = os.environ["FASTAPI_IP_ADDRESS"]
+FASTAPI_PORT = os.environ["FASTAPI_PORT"]
 
 
 def submit_embedding_request(texts: list[str]) -> list[str]:
@@ -20,6 +20,7 @@ def submit_embedding_request(texts: list[str]) -> list[str]:
         url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/low_priority",
         json={"data": data},
     )
+
     if response.status_code == 200:
         job_ids = []
         for res in response.json():
@@ -33,8 +34,9 @@ def submit_embedding_request(texts: list[str]) -> list[str]:
 
 def get_job_result(job_id: str):
     response = requests.get(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/status/{job_id}"
+        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/status/{job_id}",
     )
+
     if response.status_code == 200:
         return response.json()
     elif response.status_code == 404:
