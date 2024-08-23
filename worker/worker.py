@@ -46,7 +46,7 @@ def process_job(job: Any) -> None:
     job_data = pickle.loads(job)
     result_key, result = estimate_result(job_data=job_data)
     r.set(result_key, pickle.dumps(result))
-    print(f"Processing completed: {job_data.job_id}")
+    print(f"Processing completed: {job_data['job_id']}")
 
 
 if __name__ == "__main__":

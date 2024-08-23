@@ -18,5 +18,4 @@ class AddJobResponse(BaseModel):
 
 
 class GetResultResponse(BaseModel):
-    job_id: str
     result: list[float]

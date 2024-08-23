@@ -1,6 +1,7 @@
 import os
 import uuid
 import pickle
+from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -56,10 +57,10 @@ def add_job_as_low_priority(request: AddJobRequest):
 @app.get("/get-result/{job_id}", response_model=GetResultResponse)
 def get_job_status(job_id: str):
     result_key = get_result_key(job_id=job_id)
-    result = r.get(result_key)
+    result: Any | None = r.get(result_key)
     if result:
         r.delete(result_key)
-        return {"job_id": job_id, "result": pickle.loads(result)}
+        return {"result": pickle.loads(result)}
     else:
         raise HTTPException(status_code=404, detail="Job not found or still processing")
 
