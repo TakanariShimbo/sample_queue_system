@@ -19,6 +19,7 @@ FASTAPI_PORT = os.environ["FASTAPI_PORT"]
 
 HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
+IN_PROGRESS_SET_NAME = "in_progress_jobs"
 
 
 def get_job_data_key(job_id: str) -> str:
@@ -84,6 +85,14 @@ def get_result_of_low_priority(job_id: str):
         return {
             "data": {"embedding": result["embedding"]},
         }
+
+    if r.sismember(IN_PROGRESS_SET_NAME, job_id):
+        return JSONResponse(
+            status_code=202,
+            content={
+                "data": {"n_wait": 0},
+            },
+        )
 
     idx: int | None = r.lpos(LOW_PRIORITY_QUEUE_NAME, job_id)
     if idx is not None:

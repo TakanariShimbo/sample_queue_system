@@ -40,11 +40,11 @@ def get_job_result(job_id: str):
 
     body = response.json()
     if response.status_code == 200:
+        print(f"Finish: {job_id}")
         return body["data"]["embedding"]
     elif response.status_code == 202:
-        print(body["data"]["n_wait"])
-        return None
-    elif response.status_code == 404:
+        n_wait = body["data"]["n_wait"]
+        print(f"Wait{n_wait}: {job_id}")
         return None
     else:
         raise Exception(f"Failed to get job result: {response.text}")
@@ -56,7 +56,6 @@ def process_job(job_id):
         embdedding = get_job_result(job_id=job_id)
         if embdedding:
             break
-    print(f"Result for job {job_id}")
 
 
 if __name__ == "__main__":
@@ -68,6 +67,7 @@ if __name__ == "__main__":
         t = threading.Thread(target=process_job, args=(job_id,))
         t.start()
         threads.append(t)
+        time.sleep(0.01)
 
     for t in threads:
         t.join()

@@ -15,6 +15,7 @@ REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
 
 HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
+IN_PROGRESS_SET_NAME = "in_progress_jobs"
 
 
 def get_job_data_key(job_id: str) -> str:
@@ -76,6 +77,14 @@ def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
     return None
 
 
+def add_in_progress_to_redis(job_id: str) -> None:
+    r.sadd(IN_PROGRESS_SET_NAME, job_id)
+
+
+def delete_in_progress_from_redis(job_id: str) -> None:
+    r.srem(IN_PROGRESS_SET_NAME, job_id)
+
+
 if __name__ == "__main__":
     while True:
         job = search_job_from_redis()
@@ -83,8 +92,14 @@ if __name__ == "__main__":
             continue
 
         job_id, job_data = job
+
+        add_in_progress_to_redis(job_id)
+
         result_data = process_job(job_id=job_id, job_data=job_data)
 
         add_result_to_redis(job_id=job_id, result_data=result_data)
         delete_job_from_redis(job_id=job_id)
+
+        delete_in_progress_from_redis(job_id)
+
         time.sleep(0.1)
