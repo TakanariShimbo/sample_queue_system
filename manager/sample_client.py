@@ -1,6 +1,7 @@
 import os
 import time
 import threading
+from typing import Literal
 
 from dotenv import load_dotenv
 import requests
@@ -11,13 +12,13 @@ FASTAPI_IP_ADDRESS = os.environ["FASTAPI_IP_ADDRESS"]
 FASTAPI_PORT = os.environ["FASTAPI_PORT"]
 
 
-def submit_embedding_request(texts: list[str]) -> list[str]:
+def submit_embedding_request(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
     data = []
     for text in texts:
         data.append({"text": text})
 
     response = requests.post(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/add-job/low-priority",
+        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/add-job/{priority}-priority",
         json={"data": data},
     )
 
@@ -27,47 +28,54 @@ def submit_embedding_request(texts: list[str]) -> list[str]:
         for data in body["data"]:
             job_id = data["job_id"]
             job_ids.append(job_id)
-            print(f"Job submitted successfully. Job ID: {job_id}")
+            print(f"{job_id}: submitted to {priority}")
         return job_ids
     else:
         raise Exception(f"Failed to submit job: {response.text}")
 
 
-def get_job_result(job_id: str):
+def get_job_result(job_id: str, priority: Literal["high", "low"]):
     response = requests.get(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/get-result/low-priority/{job_id}",
+        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/get-result/{priority}-priority/{job_id}",
     )
 
     body = response.json()
     if response.status_code == 200:
-        print(f"Finish: {job_id}")
+        print(f"{job_id}: Finish")
         return body["data"]["embedding"]
     elif response.status_code == 202:
         n_wait = body["data"]["n_wait"]
-        print(f"Wait{n_wait}: {job_id}")
+        print(f"{job_id}: Wait {priority}-{n_wait}")
         return None
     else:
         raise Exception(f"Failed to get job result: {response.text}")
 
 
-def process_job(job_id):
+def process_job(job_id, priority: Literal["high", "low"]):
     while True:
         time.sleep(2.5)
-        embdedding = get_job_result(job_id=job_id)
+        embdedding = get_job_result(job_id=job_id, priority=priority)
         if embdedding:
             break
 
 
 if __name__ == "__main__":
-    job_ids = submit_embedding_request(texts=[f"sample text 1", f"sample text 2", f"sample text 3"])
+    job_ids_low = submit_embedding_request(texts=[f"sample text", f"sample text"], priority="low")
+    job_ids_high = submit_embedding_request(texts=[f"sample text", f"sample text"], priority="high")
 
-    threads = []
-
-    for job_id in job_ids:
-        t = threading.Thread(target=process_job, args=(job_id,))
+    threads_low = []
+    for job_id in job_ids_low:
+        t = threading.Thread(target=process_job, args=(job_id, "low"))
         t.start()
-        threads.append(t)
+        threads_low.append(t)
         time.sleep(0.01)
 
-    for t in threads:
+    threads_high = []
+    for job_id in job_ids_high:
+        t = threading.Thread(target=process_job, args=(job_id, "high"))
+        t.start()
+        threads_high.append(t)
+        time.sleep(0.01)
+
+    for t in threads_low + threads_high:
         t.join()

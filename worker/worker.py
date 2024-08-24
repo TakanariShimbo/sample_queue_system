@@ -102,4 +102,4 @@ if __name__ == "__main__":
 
         delete_in_progress_from_redis(job_id)
 
-        time.sleep(0.1)
+        time.sleep(1)
