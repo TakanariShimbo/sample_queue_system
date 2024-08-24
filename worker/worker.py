@@ -16,44 +16,50 @@ REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
 HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
 
-r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
-
 
 def get_result_key(job_id: str) -> str:
     return f"result:{job_id}"
 
 
-def estimate_result(job_data: Any) -> Any:
-    result_key = get_result_key(job_id=job_data["job_id"])
-    time.sleep(5)
+r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
+
+
+def estimate_result(job_data: dict[str, Any]) -> tuple[str, Any]:
     result = [random.uniform(0, 1) for _ in range(1024)]
-    return result_key, result
+    time.sleep(5)
+    return job_data["job_id"], result
 
 
-def get_job() -> Any | None:
-    high_priority_job = r.lpop(HIGH_PRIORITY_QUEUE_NAME)
-    if high_priority_job:
-        return high_priority_job
-
-    low_priority_job = r.lpop(LOW_PRIORITY_QUEUE_NAME)
-    if low_priority_job:
-        return low_priority_job
-
-    return None
+def get_job_from_redis(queue_name: str) -> dict[str, Any] | None:
+    raw_job_data: Any | None = r.lpop(queue_name)
+    if raw_job_data is None:
+        return None
+    job_data = pickle.loads(raw_job_data)
+    return job_data
 
 
-def process_job(job: Any) -> None:
-    job_data = pickle.loads(job)
-    result_key, result = estimate_result(job_data=job_data)
+def add_result_to_redis(job_id: str, result: Any) -> None:
+    result_key = get_result_key(job_id=job_id)
     r.set(result_key, pickle.dumps(result))
-    print(f"Processing completed: {job_data['job_id']}")
+
+
+def search_job_from_redis() -> dict[str, Any] | None:
+    for queue_name in [HIGH_PRIORITY_QUEUE_NAME, LOW_PRIORITY_QUEUE_NAME]:
+        job_data = get_job_from_redis(queue_name=queue_name)
+        if job_data:
+            return job_data
+    return None
 
 
 if __name__ == "__main__":
     while True:
-        job = get_job()
-        if job is None:
+        job_data = search_job_from_redis()
+        if job_data is None:
             continue
 
-        process_job(job=job)
+        job_id, result = estimate_result(job_data=job_data)
+        print(f"Processing completed: {job_id}")
+
+        add_result_to_redis(job_id=job_id, result=result)
+
         time.sleep(0.1)
