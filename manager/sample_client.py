@@ -34,9 +34,9 @@ def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
         raise Exception(f"Failed to submit job: {response.text}")
 
 
-def request_result(job_id: str, priority: Literal["high", "low"]):
+def request_result(job_id: str):
     response = requests.get(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/get-result/{priority}-priority/{job_id}",
+        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/get-result/{job_id}",
     )
 
     body = response.json()
@@ -45,16 +45,16 @@ def request_result(job_id: str, priority: Literal["high", "low"]):
         return body["data"]["embedding"]
     elif response.status_code == 202:
         n_wait = body["data"]["n_wait"]
-        print(f"{job_id}: Wait {priority}-{n_wait}")
+        print(f"{job_id}: Wait {n_wait}")
         return None
     else:
         raise Exception(f"Failed to get job result: {response.text}")
 
 
-def observe_submited_job(job_id, priority: Literal["high", "low"]):
+def observe_submited_job(job_id):
     while True:
         time.sleep(2.5)
-        embdedding = request_result(job_id=job_id, priority=priority)
+        embdedding = request_result(job_id=job_id)
         if embdedding is not None:
             break
 
@@ -63,19 +63,12 @@ if __name__ == "__main__":
     job_ids_low = submit_job(texts=[f"sample text", f"sample text"], priority="low")
     job_ids_high = submit_job(texts=[f"sample text", f"sample text"], priority="high")
 
-    threads_low = []
-    for job_id in job_ids_low:
-        t = threading.Thread(target=observe_submited_job, args=(job_id, "low"))
+    threads = []
+    for job_id in job_ids_low + job_ids_high:
+        t = threading.Thread(target=observe_submited_job, args=(job_id,))
         t.start()
-        threads_low.append(t)
+        threads.append(t)
         time.sleep(0.01)
 
-    threads_high = []
-    for job_id in job_ids_high:
-        t = threading.Thread(target=observe_submited_job, args=(job_id, "high"))
-        t.start()
-        threads_high.append(t)
-        time.sleep(0.01)
-
-    for t in threads_low + threads_high:
+    for t in threads:
         t.join()

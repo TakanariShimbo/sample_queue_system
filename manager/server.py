@@ -68,7 +68,7 @@ def add_job_process(queue_name: str, request: AddJobRequest):
     return {"data": response_data}
 
 
-def get_result_process(queue_name: str, job_id: str):
+def get_result_process(job_id: str):
     result = get_result_data_from_redis(job_id=job_id)
     if result:
         return {
@@ -83,12 +83,22 @@ def get_result_process(queue_name: str, job_id: str):
             },
         )
 
-    idx: int | None = r.lpos(queue_name, job_id)
-    if idx is not None:
+    h_idx: int | None = r.lpos(HIGH_PRIORITY_QUEUE_NAME, job_id)
+    if h_idx is not None:
         return JSONResponse(
             status_code=202,
             content={
-                "data": {"n_wait": idx + 1},
+                "data": {"n_wait": h_idx + 1},
+            },
+        )
+
+    l_idx: int | None = r.lpos(LOW_PRIORITY_QUEUE_NAME, job_id)
+    if l_idx is not None:
+        h_length: int = r.llen(HIGH_PRIORITY_QUEUE_NAME)
+        return JSONResponse(
+            status_code=202,
+            content={
+                "data": {"n_wait": h_length + l_idx + 1},
             },
         )
 
@@ -105,14 +115,9 @@ def add_job_as_low_priority(request: AddJobRequest):
     return add_job_process(queue_name=LOW_PRIORITY_QUEUE_NAME, request=request)
 
 
-@app.get("/get-result/high-priority/{job_id}", response_model=GetResultResponse)
-def get_result_of_high_priority(job_id: str):
-    return get_result_process(queue_name=HIGH_PRIORITY_QUEUE_NAME, job_id=job_id)
-
-
-@app.get("/get-result/low-priority/{job_id}", response_model=GetResultResponse)
-def get_result_of_low_priority(job_id: str):
-    return get_result_process(queue_name=LOW_PRIORITY_QUEUE_NAME, job_id=job_id)
+@app.get("/get-result/{job_id}", response_model=GetResultResponse)
+def get_result(job_id: str):
+    return get_result_process(job_id=job_id)
 
 
 if __name__ == "__main__":
