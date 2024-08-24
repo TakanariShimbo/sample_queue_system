@@ -5,6 +5,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 import redis
 
 from scheme import AddJobRequest, AddJobResponse, GetResultResponse
@@ -20,8 +21,12 @@ HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
 
 
-def get_result_key(job_id: str) -> str:
-    return f"result:{job_id}"
+def get_job_data_key(job_id: str) -> str:
+    return f"job_data:{job_id}"
+
+
+def get_result_data_key(job_id: str) -> str:
+    return f"result_data:{job_id}"
 
 
 r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
@@ -29,53 +34,67 @@ r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDI
 
 def add_job_to_redis(queue_name: str, text: str) -> str:
     job_id = str(uuid.uuid4())
+
     job_data = {
-        "job_id": job_id,
-        "texts": text,
+        "text": text,
     }
-    r.rpush(queue_name, pickle.dumps(job_data))
+    job_data_key = get_job_data_key(job_id=job_id)
+    r.set(job_data_key, pickle.dumps(job_data))
+
+    r.rpush(queue_name, job_id)
     return job_id
 
 
-def get_result_from_redis(job_id: str) -> None:
-    result_key = get_result_key(job_id=job_id)
-    raw_result: Any | None = r.get(result_key)
+def get_result_data_from_redis(job_id: str) -> None:
+    result_data_key = get_result_data_key(job_id=job_id)
+    raw_result_data: Any | None = r.get(result_data_key)
 
-    if raw_result is None:
+    if raw_result_data is None:
         return None
 
-    r.delete(result_key)
-    return pickle.loads(raw_result)
+    r.delete(result_data_key)
+    return pickle.loads(raw_result_data)
 
 
 app = FastAPI()
 
 
-@app.post("/add-job/high-priority", response_model=AddJobResponse)
-def add_job_as_high_priority(request: AddJobRequest):
+def add_job_process(queue_name: str, request: AddJobRequest):
     response_data = []
     for request_data in request.data:
-        job_id = add_job_to_redis(queue_name=HIGH_PRIORITY_QUEUE_NAME, text=request_data.text)
+        job_id = add_job_to_redis(queue_name=queue_name, text=request_data.text)
         response_data.append({"job_id": job_id})
     return {"data": response_data}
+
+
+@app.post("/add-job/high-priority", response_model=AddJobResponse)
+def add_job_as_high_priority(request: AddJobRequest):
+    return add_job_process(queue_name=HIGH_PRIORITY_QUEUE_NAME, request=request)
 
 
 @app.post("/add-job/low-priority", response_model=AddJobResponse)
 def add_job_as_low_priority(request: AddJobRequest):
-    response_data = []
-    for request_data in request.data:
-        job_id = add_job_to_redis(queue_name=LOW_PRIORITY_QUEUE_NAME, text=request_data.text)
-        response_data.append({"job_id": job_id})
-    return {"data": response_data}
+    return add_job_process(queue_name=LOW_PRIORITY_QUEUE_NAME, request=request)
 
 
-@app.get("/get-result/{job_id}", response_model=GetResultResponse)
-def get_result(job_id: str):
-    result = get_result_from_redis(job_id=job_id)
+@app.get("/get-result/low-priority/{job_id}", response_model=GetResultResponse)
+def get_result_of_low_priority(job_id: str):
+    result = get_result_data_from_redis(job_id=job_id)
     if result:
-        return {"result": result}
-    else:
-        raise HTTPException(status_code=404, detail="Job not found or still processing")
+        return {
+            "data": {"embedding": result["embedding"]},
+        }
+
+    idx: int | None = r.lpos(LOW_PRIORITY_QUEUE_NAME, job_id)
+    if idx is not None:
+        return JSONResponse(
+            status_code=202,
+            content={
+                "data": {"n_wait": idx + 1},
+            },
+        )
+
+    raise HTTPException(status_code=404, detail="Job not found")
 
 
 if __name__ == "__main__":

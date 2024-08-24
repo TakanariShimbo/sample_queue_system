@@ -17,49 +17,74 @@ HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
 
 
-def get_result_key(job_id: str) -> str:
-    return f"result:{job_id}"
+def get_job_data_key(job_id: str) -> str:
+    return f"job_data:{job_id}"
+
+
+def get_result_data_key(job_id: str) -> str:
+    return f"result_data:{job_id}"
 
 
 r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
-def estimate_result(job_data: dict[str, Any]) -> tuple[str, Any]:
-    result = [random.uniform(0, 1) for _ in range(1024)]
+def _word_to_vector(job_data: dict[str, Any]) -> Any:
+    embedding = [random.uniform(0, 1) for _ in range(1024)]
     time.sleep(5)
-    return job_data["job_id"], result
+    return embedding
 
 
-def get_job_from_redis(queue_name: str) -> dict[str, Any] | None:
-    raw_job_data: Any | None = r.lpop(queue_name)
-    if raw_job_data is None:
+def process_job(job_id: str, job_data: dict[str, Any]) -> dict[str, Any]:
+    embedding = _word_to_vector(job_data=job_data)
+    print(f"Processing completed: {job_id}")
+
+    result_data = {
+        "embedding": embedding,
+    }
+    return result_data
+
+
+def _get_job_from_redis(queue_name: str) -> tuple[str, dict[str, Any]] | None:
+    raw_job_id: bytes | None = r.lpop(queue_name)
+
+    if raw_job_id is None:
         return None
-    job_data = pickle.loads(raw_job_data)
-    return job_data
+
+    job_id = raw_job_id.decode("utf-8")
+    job_data_key = get_job_data_key(job_id=job_id)
+    raw_job_data = r.get(job_data_key)
+    job_data: dict[str, Any] = pickle.loads(raw_job_data)
+
+    return job_id, job_data
 
 
-def add_result_to_redis(job_id: str, result: Any) -> None:
-    result_key = get_result_key(job_id=job_id)
-    r.set(result_key, pickle.dumps(result))
+def add_result_to_redis(job_id: str, result_data: dict[str, Any]) -> None:
+    result_data_key = get_result_data_key(job_id=job_id)
+    r.set(result_data_key, pickle.dumps(result_data))
 
 
-def search_job_from_redis() -> dict[str, Any] | None:
+def delete_job_from_redis(job_id: str) -> None:
+    job_data_key = get_job_data_key(job_id=job_id)
+    r.delete(job_data_key)
+
+
+def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
     for queue_name in [HIGH_PRIORITY_QUEUE_NAME, LOW_PRIORITY_QUEUE_NAME]:
-        job_data = get_job_from_redis(queue_name=queue_name)
-        if job_data:
-            return job_data
+        job = _get_job_from_redis(queue_name=queue_name)
+        if job:
+            return job
     return None
 
 
 if __name__ == "__main__":
     while True:
-        job_data = search_job_from_redis()
-        if job_data is None:
+        job = search_job_from_redis()
+        if job is None:
             continue
 
-        job_id, result = estimate_result(job_data=job_data)
-        print(f"Processing completed: {job_id}")
+        job_id, job_data = job
+        result_data = process_job(job_id=job_id, job_data=job_data)
 
-        add_result_to_redis(job_id=job_id, result=result)
-
+        add_result_to_redis(job_id=job_id, result_data=result_data)
+        delete_job_from_redis(job_id=job_id)
         time.sleep(0.1)

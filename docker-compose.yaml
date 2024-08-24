@@ -10,3 +10,10 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--bind", "0.0.0.0"]
     restart: always
+
+  redis-insight-service:
+    container_name: redis-insight-container
+    image: redislabs/redisinsight:latest
+    ports:
+      - ${REDIS_INSIGHT_PORT}:5540
+    restart: always

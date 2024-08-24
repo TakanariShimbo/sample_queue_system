@@ -35,11 +35,15 @@ def submit_embedding_request(texts: list[str]) -> list[str]:
 
 def get_job_result(job_id: str):
     response = requests.get(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/get-result/{job_id}",
+        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/get-result/low-priority/{job_id}",
     )
 
+    body = response.json()
     if response.status_code == 200:
-        return response.json()
+        return body["data"]["embedding"]
+    elif response.status_code == 202:
+        print(body["data"]["n_wait"])
+        return None
     elif response.status_code == 404:
         return None
     else:
@@ -47,15 +51,16 @@ def get_job_result(job_id: str):
 
 
 def process_job(job_id):
-    result = None
-    while result is None:
+    while True:
         time.sleep(2.5)
-        result = get_job_result(job_id)
+        embdedding = get_job_result(job_id=job_id)
+        if embdedding:
+            break
     print(f"Result for job {job_id}")
 
 
 if __name__ == "__main__":
-    job_ids = submit_embedding_request(texts=[f"sample text 1", f"sample text 2"])
+    job_ids = submit_embedding_request(texts=[f"sample text 1", f"sample text 2", f"sample text 3"])
 
     threads = []
 

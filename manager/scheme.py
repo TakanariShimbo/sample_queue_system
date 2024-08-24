@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -17,5 +19,13 @@ class AddJobResponse(BaseModel):
     data: list[AddJobResponseData]
 
 
+class GetResultResponseSuccessData(BaseModel):
+    embedding: list[float]
+
+
+class GetResultResponseProcessingData(BaseModel):
+    n_wait: int
+
+
 class GetResultResponse(BaseModel):
-    result: list[float]
+    data: GetResultResponseSuccessData | GetResultResponseProcessingData
