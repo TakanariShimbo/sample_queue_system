@@ -68,18 +68,7 @@ def add_job_process(queue_name: str, request: AddJobRequest):
     return {"data": response_data}
 
 
-@app.post("/add-job/high-priority", response_model=AddJobResponse)
-def add_job_as_high_priority(request: AddJobRequest):
-    return add_job_process(queue_name=HIGH_PRIORITY_QUEUE_NAME, request=request)
-
-
-@app.post("/add-job/low-priority", response_model=AddJobResponse)
-def add_job_as_low_priority(request: AddJobRequest):
-    return add_job_process(queue_name=LOW_PRIORITY_QUEUE_NAME, request=request)
-
-
-@app.get("/get-result/low-priority/{job_id}", response_model=GetResultResponse)
-def get_result_of_low_priority(job_id: str):
+def get_result_process(queue_name: str, job_id: str):
     result = get_result_data_from_redis(job_id=job_id)
     if result:
         return {
@@ -94,7 +83,7 @@ def get_result_of_low_priority(job_id: str):
             },
         )
 
-    idx: int | None = r.lpos(LOW_PRIORITY_QUEUE_NAME, job_id)
+    idx: int | None = r.lpos(queue_name, job_id)
     if idx is not None:
         return JSONResponse(
             status_code=202,
@@ -104,6 +93,26 @@ def get_result_of_low_priority(job_id: str):
         )
 
     raise HTTPException(status_code=404, detail="Job not found")
+
+
+@app.post("/add-job/high-priority", response_model=AddJobResponse)
+def add_job_as_high_priority(request: AddJobRequest):
+    return add_job_process(queue_name=HIGH_PRIORITY_QUEUE_NAME, request=request)
+
+
+@app.post("/add-job/low-priority", response_model=AddJobResponse)
+def add_job_as_low_priority(request: AddJobRequest):
+    return add_job_process(queue_name=LOW_PRIORITY_QUEUE_NAME, request=request)
+
+
+@app.get("/get-result/high-priority/{job_id}", response_model=GetResultResponse)
+def get_result_of_high_priority(job_id: str):
+    return get_result_process(queue_name=HIGH_PRIORITY_QUEUE_NAME, job_id=job_id)
+
+
+@app.get("/get-result/low-priority/{job_id}", response_model=GetResultResponse)
+def get_result_of_low_priority(job_id: str):
+    return get_result_process(queue_name=LOW_PRIORITY_QUEUE_NAME, job_id=job_id)
 
 
 if __name__ == "__main__":
