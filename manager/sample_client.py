@@ -55,7 +55,7 @@ def observe_submited_job(job_id, priority: Literal["high", "low"]):
     while True:
         time.sleep(2.5)
         embdedding = request_result(job_id=job_id, priority=priority)
-        if embdedding:
+        if embdedding is not None:
             break
 
 
