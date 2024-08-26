@@ -4,11 +4,11 @@ services:
   redis-service:
     container_name: redis-container
     image: redis:latest
-    ports:
-      - ${REDIS_PORT}:6379
+    # ports:
+    #   - ${REDIS_PORT}:6379
     environment:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--bind", "0.0.0.0"]
+    command: [ "redis-server", "--requirepass", "${REDIS_PASSWORD}", "--bind", "0.0.0.0" ]
     restart: always
 
   redis-insight-service:
@@ -17,3 +17,32 @@ services:
     ports:
       - ${REDIS_INSIGHT_PORT}:5540
     restart: always
+
+  manager-service:
+    container_name: manager-container
+    image: queue-system-manager
+    ports:
+      - "${MANAGER_PORT}:8000"
+    environment:
+      - REDIS_IP_ADDRESS=redis-container
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: [ "python3", "server.py" ]
+    depends_on:
+      - redis-service
+    restart: always
+    tty: true
+
+  worker-service:
+    container_name: worker-container
+    image: queue-system-worker
+    environment:
+      - REDIS_IP_ADDRESS=redis-container
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: [ "python3", "worker.py" ]
+    working_dir: /work
+    depends_on:
+      - redis-service
+    restart: always
+    tty: true

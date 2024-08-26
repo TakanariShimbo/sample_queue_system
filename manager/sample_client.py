@@ -8,8 +8,8 @@ import requests
 
 
 load_dotenv()
-FASTAPI_IP_ADDRESS = os.environ["FASTAPI_IP_ADDRESS"]
-FASTAPI_PORT = os.environ["FASTAPI_PORT"]
+MANAGER_IP_ADDRESS = os.environ["MANAGER_IP_ADDRESS"]
+MANAGER_PORT = os.environ["MANAGER_PORT"]
 
 
 def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
@@ -18,7 +18,7 @@ def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
         data.append({"text": text})
 
     response = requests.post(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/add-job/{priority}-priority",
+        url=f"http://{MANAGER_IP_ADDRESS}:{MANAGER_PORT}/add-job/{priority}-priority",
         json={"data": data},
     )
 
@@ -36,7 +36,7 @@ def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
 
 def request_result(job_id: str):
     response = requests.get(
-        url=f"http://{FASTAPI_IP_ADDRESS}:{FASTAPI_PORT}/get-result/{job_id}",
+        url=f"http://{MANAGER_IP_ADDRESS}:{MANAGER_PORT}/get-result/{job_id}",
     )
 
     body = response.json()

@@ -15,7 +15,6 @@ load_dotenv()
 REDIS_IP_ADDRESS = os.environ["REDIS_IP_ADDRESS"]
 REDIS_PORT = os.environ["REDIS_PORT"]
 REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
-FASTAPI_PORT = os.environ["FASTAPI_PORT"]
 
 HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
@@ -30,7 +29,9 @@ def get_result_data_key(job_id: str) -> str:
     return f"result_data:{job_id}"
 
 
-r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
+r = redis.Redis(
+    host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD
+)
 
 
 def add_job_to_redis(queue_name: str, text: str) -> str:
@@ -123,4 +124,4 @@ def get_result(job_id: str):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=int(FASTAPI_PORT))
+    uvicorn.run(app, host="0.0.0.0", port=8000)
