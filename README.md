@@ -43,3 +43,6 @@ Database Alias: Your optional name
 Username: default
 Password: Your .env setting
 ```
+
+## Sequence Diagram
+![sequence_diagram](./sequence_diagram.svg)
