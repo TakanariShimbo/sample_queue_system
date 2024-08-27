@@ -26,23 +26,15 @@ def get_result_data_key(job_id: str) -> str:
     return f"result_data:{job_id}"
 
 
-r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
+r = redis.Redis(
+    host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD
+)
 
 
 def _word_to_vector(job_data: dict[str, Any]) -> Any:
     embedding = [random.uniform(0, 1) for _ in range(1024)]
     time.sleep(5)
     return embedding
-
-
-def process_job(job_id: str, job_data: dict[str, Any]) -> dict[str, Any]:
-    embedding = _word_to_vector(job_data=job_data)
-    print(f"Processing completed: {job_id}")
-
-    result_data = {
-        "embedding": embedding,
-    }
-    return result_data
 
 
 def _get_job_from_redis(queue_name: str) -> tuple[str, dict[str, Any]] | None:
@@ -69,6 +61,14 @@ def delete_job_from_redis(job_id: str) -> None:
     r.delete(job_data_key)
 
 
+def add_in_progress_to_redis(job_id: str) -> None:
+    r.sadd(IN_PROGRESS_SET_NAME, job_id)
+
+
+def delete_in_progress_from_redis(job_id: str) -> None:
+    r.srem(IN_PROGRESS_SET_NAME, job_id)
+
+
 def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
     for queue_name in [HIGH_PRIORITY_QUEUE_NAME, LOW_PRIORITY_QUEUE_NAME]:
         job = _get_job_from_redis(queue_name=queue_name)
@@ -77,12 +77,22 @@ def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
     return None
 
 
-def add_in_progress_to_redis(job_id: str) -> None:
-    r.sadd(IN_PROGRESS_SET_NAME, job_id)
+def process_job(job_id: str, job_data: dict[str, Any]) -> None:
+    add_in_progress_to_redis(job_id)
 
+    embedding = _word_to_vector(job_data=job_data)
+    print(f"Processing completed: {job_id}")
 
-def delete_in_progress_from_redis(job_id: str) -> None:
-    r.srem(IN_PROGRESS_SET_NAME, job_id)
+    result_data = {
+        "embedding": embedding,
+    }
+
+    add_result_to_redis(job_id=job_id, result_data=result_data)
+    delete_job_from_redis(job_id=job_id)
+
+    delete_in_progress_from_redis(job_id)
+
+    return result_data
 
 
 if __name__ == "__main__":
@@ -93,13 +103,6 @@ if __name__ == "__main__":
 
         job_id, job_data = job
 
-        add_in_progress_to_redis(job_id)
-
-        result_data = process_job(job_id=job_id, job_data=job_data)
-
-        add_result_to_redis(job_id=job_id, result_data=result_data)
-        delete_job_from_redis(job_id=job_id)
-
-        delete_in_progress_from_redis(job_id)
+        process_job(job_id=job_id, job_data=job_data)
 
         time.sleep(1)
