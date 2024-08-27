@@ -102,7 +102,6 @@ if __name__ == "__main__":
             continue
 
         job_id, job_data = job
-
         process_job(job_id=job_id, job_data=job_data)
 
         time.sleep(1)
