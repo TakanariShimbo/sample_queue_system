@@ -47,8 +47,9 @@ def add_job_to_redis(queue_name: str, text: str) -> str:
     job_data_key = get_job_data_key(job_id=job_id)
     r.set(job_data_key, pickle.dumps(job_data))
 
-    r.rpush(queue_name, job_id)
     add_pre_progress_to_redis(job_id=job_id)
+    
+    r.rpush(queue_name, job_id)
     return job_id
 
 
