@@ -18,7 +18,7 @@ REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
 
 HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
-IN_PROGRESS_SET_NAME = "in_progress_jobs"
+PRE_PROGRESS_SET_NAME = "pre_progress_jobs"
 
 
 def get_job_data_key(job_id: str) -> str:
@@ -34,6 +34,10 @@ r = redis.Redis(
 )
 
 
+def add_pre_progress_to_redis(job_id: str) -> None:
+    r.sadd(PRE_PROGRESS_SET_NAME, job_id)
+
+
 def add_job_to_redis(queue_name: str, text: str) -> str:
     job_id = str(uuid.uuid4())
 
@@ -44,6 +48,7 @@ def add_job_to_redis(queue_name: str, text: str) -> str:
     r.set(job_data_key, pickle.dumps(job_data))
 
     r.rpush(queue_name, job_id)
+    add_pre_progress_to_redis(job_id=job_id)
     return job_id
 
 
@@ -70,20 +75,6 @@ def add_job_process(queue_name: str, request: AddJobRequest):
 
 
 def get_result_process(job_id: str):
-    result = get_result_data_from_redis(job_id=job_id)
-    if result:
-        return {
-            "data": {"embedding": result["embedding"]},
-        }
-
-    if r.sismember(IN_PROGRESS_SET_NAME, job_id):
-        return JSONResponse(
-            status_code=202,
-            content={
-                "data": {"n_wait": 0},
-            },
-        )
-
     h_idx: int | None = r.lpos(HIGH_PRIORITY_QUEUE_NAME, job_id)
     if h_idx is not None:
         return JSONResponse(
@@ -102,6 +93,20 @@ def get_result_process(job_id: str):
                 "data": {"n_wait": h_length + l_idx + 1},
             },
         )
+
+    if r.sismember(PRE_PROGRESS_SET_NAME, job_id):
+        return JSONResponse(
+            status_code=202,
+            content={
+                "data": {"n_wait": 0},
+            },
+        )
+
+    result = get_result_data_from_redis(job_id=job_id)
+    if result:
+        return {
+            "data": {"embedding": result["embedding"]},
+        }
 
     raise HTTPException(status_code=404, detail="Job not found")
 

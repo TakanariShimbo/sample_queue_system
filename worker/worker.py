@@ -15,7 +15,7 @@ REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
 
 HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
 LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
-IN_PROGRESS_SET_NAME = "in_progress_jobs"
+PRE_PROGRESS_SET_NAME = "pre_progress_jobs"
 
 
 def get_job_data_key(job_id: str) -> str:
@@ -61,12 +61,8 @@ def delete_job_from_redis(job_id: str) -> None:
     r.delete(job_data_key)
 
 
-def add_in_progress_to_redis(job_id: str) -> None:
-    r.sadd(IN_PROGRESS_SET_NAME, job_id)
-
-
-def delete_in_progress_from_redis(job_id: str) -> None:
-    r.srem(IN_PROGRESS_SET_NAME, job_id)
+def delete_pre_progress_from_redis(job_id: str) -> None:
+    r.srem(PRE_PROGRESS_SET_NAME, job_id)
 
 
 def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
@@ -78,8 +74,6 @@ def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
 
 
 def process_job(job_id: str, job_data: dict[str, Any]) -> None:
-    add_in_progress_to_redis(job_id)
-
     embedding = _word_to_vector(job_data=job_data)
     print(f"Processing completed: {job_id}")
 
@@ -88,9 +82,9 @@ def process_job(job_id: str, job_data: dict[str, Any]) -> None:
     }
 
     add_result_to_redis(job_id=job_id, result_data=result_data)
-    delete_job_from_redis(job_id=job_id)
 
-    delete_in_progress_from_redis(job_id)
+    delete_job_from_redis(job_id=job_id)
+    delete_pre_progress_from_redis(job_id)
 
     return result_data
 
