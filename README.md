@@ -46,3 +46,6 @@ Password: Your .env setting
 
 ## Sequence Diagram
 ![sequence_diagram](./sequence_diagram.svg)
+
+## System Diagram
+![system_diagram](./system_diagram.jpg)
