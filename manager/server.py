@@ -16,9 +16,9 @@ REDIS_IP_ADDRESS = os.environ["REDIS_IP_ADDRESS"]
 REDIS_PORT = os.environ["REDIS_PORT"]
 REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
 
-HIGH_PRIORITY_QUEUE_NAME = "high_priority_queue"
-LOW_PRIORITY_QUEUE_NAME = "low_priority_queue"
-PRE_PROGRESS_SET_NAME = "pre_progress_jobs"
+HIGH_PRIORITY_QUEUE_LIST_NAME = "high_priority_queue_list"
+LOW_PRIORITY_QUEUE_LIST_NAME = "low_priority_queue_list"
+PRE_PROCESS_JOB_SET_NAME = "pre_process_job_set"
 
 
 def get_job_data_key(job_id: str) -> str:
@@ -29,16 +29,14 @@ def get_result_data_key(job_id: str) -> str:
     return f"result_data:{job_id}"
 
 
-r = redis.Redis(
-    host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD
-)
+r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
-def add_pre_progress_to_redis(job_id: str) -> None:
-    r.sadd(PRE_PROGRESS_SET_NAME, job_id)
+def add_pre_process_job_to_redis(job_id: str) -> None:
+    r.sadd(PRE_PROCESS_JOB_SET_NAME, job_id)
 
 
-def add_job_to_redis(queue_name: str, text: str) -> str:
+def add_job_to_redis(queue_list_name: str, text: str) -> str:
     job_id = str(uuid.uuid4())
 
     job_data = {
@@ -47,9 +45,9 @@ def add_job_to_redis(queue_name: str, text: str) -> str:
     job_data_key = get_job_data_key(job_id=job_id)
     r.set(job_data_key, pickle.dumps(job_data))
 
-    add_pre_progress_to_redis(job_id=job_id)
-    
-    r.rpush(queue_name, job_id)
+    add_pre_process_job_to_redis(job_id=job_id)
+
+    r.rpush(queue_list_name, job_id)
     return job_id
 
 
@@ -67,16 +65,16 @@ def get_result_data_from_redis(job_id: str) -> None:
 app = FastAPI()
 
 
-def add_job_process(queue_name: str, request: AddJobRequest):
+def add_job_process(queue_list_name: str, request: AddJobRequest):
     response_data = []
     for request_data in request.data:
-        job_id = add_job_to_redis(queue_name=queue_name, text=request_data.text)
+        job_id = add_job_to_redis(queue_list_name=queue_list_name, text=request_data.text)
         response_data.append({"job_id": job_id})
     return {"data": response_data}
 
 
 def get_result_process(job_id: str):
-    h_idx: int | None = r.lpos(HIGH_PRIORITY_QUEUE_NAME, job_id)
+    h_idx: int | None = r.lpos(HIGH_PRIORITY_QUEUE_LIST_NAME, job_id)
     if h_idx is not None:
         return JSONResponse(
             status_code=202,
@@ -85,9 +83,9 @@ def get_result_process(job_id: str):
             },
         )
 
-    l_idx: int | None = r.lpos(LOW_PRIORITY_QUEUE_NAME, job_id)
+    l_idx: int | None = r.lpos(LOW_PRIORITY_QUEUE_LIST_NAME, job_id)
     if l_idx is not None:
-        h_length: int = r.llen(HIGH_PRIORITY_QUEUE_NAME)
+        h_length: int = r.llen(HIGH_PRIORITY_QUEUE_LIST_NAME)
         return JSONResponse(
             status_code=202,
             content={
@@ -95,7 +93,7 @@ def get_result_process(job_id: str):
             },
         )
 
-    if r.sismember(PRE_PROGRESS_SET_NAME, job_id):
+    if r.sismember(PRE_PROCESS_JOB_SET_NAME, job_id):
         return JSONResponse(
             status_code=202,
             content={
@@ -114,12 +112,12 @@ def get_result_process(job_id: str):
 
 @app.post("/add-job/high-priority", response_model=AddJobResponse)
 def add_job_as_high_priority(request: AddJobRequest):
-    return add_job_process(queue_name=HIGH_PRIORITY_QUEUE_NAME, request=request)
+    return add_job_process(queue_list_name=HIGH_PRIORITY_QUEUE_LIST_NAME, request=request)
 
 
 @app.post("/add-job/low-priority", response_model=AddJobResponse)
 def add_job_as_low_priority(request: AddJobRequest):
-    return add_job_process(queue_name=LOW_PRIORITY_QUEUE_NAME, request=request)
+    return add_job_process(queue_list_name=LOW_PRIORITY_QUEUE_LIST_NAME, request=request)
 
 
 @app.get("/get-result/{job_id}", response_model=GetResultResponse)
