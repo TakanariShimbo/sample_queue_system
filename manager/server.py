@@ -32,8 +32,17 @@ def get_result_data_key(job_id: str) -> str:
 r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
+def add_job_data_to_redis(job_id: str, job_data: dict[str, Any]) -> None:
+    job_data_key = get_job_data_key(job_id=job_id)
+    r.set(job_data_key, pickle.dumps(job_data))
+
+
 def add_pre_process_job_to_redis(job_id: str) -> None:
     r.sadd(PRE_PROCESS_JOB_SET_NAME, job_id)
+
+
+def add_job_queue_to_redis(queue_list_name: str, job_id: str) -> None:
+    r.rpush(queue_list_name, job_id)
 
 
 def add_job_to_redis(queue_list_name: str, text: str) -> str:
@@ -42,12 +51,11 @@ def add_job_to_redis(queue_list_name: str, text: str) -> str:
     job_data = {
         "text": text,
     }
-    job_data_key = get_job_data_key(job_id=job_id)
-    r.set(job_data_key, pickle.dumps(job_data))
+    add_job_data_to_redis(job_id=job_id, job_data=job_data)
 
     add_pre_process_job_to_redis(job_id=job_id)
 
-    r.rpush(queue_list_name, job_id)
+    add_job_queue_to_redis(queue_list_name=queue_list_name, job_id=job_id)
     return job_id
 
 
