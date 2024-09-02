@@ -13,8 +13,8 @@ REDIS_IP_ADDRESS = os.environ["REDIS_IP_ADDRESS"]
 REDIS_PORT = os.environ["REDIS_PORT"]
 REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
 
-HIGH_PRIORITY_QUEUE_LIST_NAME = "high_priority_queue_list"
-LOW_PRIORITY_QUEUE_LIST_NAME = "low_priority_queue_list"
+HIGH_PRIORITY_JOB_LIST_NAME = "high_priority_job_list"
+LOW_PRIORITY_JOB_LIST_NAME = "low_priority_job_list"
 PRE_PROCESS_JOB_SET_NAME = "pre_process_job_set"
 
 
@@ -64,7 +64,7 @@ def delete_pre_process_job_from_redis(job_id: str) -> None:
 
 
 def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
-    for queue_list_name in [HIGH_PRIORITY_QUEUE_LIST_NAME, LOW_PRIORITY_QUEUE_LIST_NAME]:
+    for queue_list_name in [HIGH_PRIORITY_JOB_LIST_NAME, LOW_PRIORITY_JOB_LIST_NAME]:
         job = _get_job_from_redis(queue_list_name=queue_list_name)
         if job:
             return job

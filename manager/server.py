@@ -16,8 +16,8 @@ REDIS_IP_ADDRESS = os.environ["REDIS_IP_ADDRESS"]
 REDIS_PORT = os.environ["REDIS_PORT"]
 REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
 
-HIGH_PRIORITY_QUEUE_LIST_NAME = "high_priority_queue_list"
-LOW_PRIORITY_QUEUE_LIST_NAME = "low_priority_queue_list"
+HIGH_PRIORITY_JOB_LIST_NAME = "high_priority_job_list"
+LOW_PRIORITY_JOB_LIST_NAME = "low_priority_job_list"
 PRE_PROCESS_JOB_SET_NAME = "pre_process_job_set"
 
 
@@ -82,7 +82,7 @@ def add_job_process(queue_list_name: str, request: AddJobRequest):
 
 
 def get_result_process(job_id: str):
-    h_idx: int | None = r.lpos(HIGH_PRIORITY_QUEUE_LIST_NAME, job_id)
+    h_idx: int | None = r.lpos(HIGH_PRIORITY_JOB_LIST_NAME, job_id)
     if h_idx is not None:
         return JSONResponse(
             status_code=202,
@@ -91,9 +91,9 @@ def get_result_process(job_id: str):
             },
         )
 
-    l_idx: int | None = r.lpos(LOW_PRIORITY_QUEUE_LIST_NAME, job_id)
+    l_idx: int | None = r.lpos(LOW_PRIORITY_JOB_LIST_NAME, job_id)
     if l_idx is not None:
-        h_length: int = r.llen(HIGH_PRIORITY_QUEUE_LIST_NAME)
+        h_length: int = r.llen(HIGH_PRIORITY_JOB_LIST_NAME)
         return JSONResponse(
             status_code=202,
             content={
@@ -120,12 +120,12 @@ def get_result_process(job_id: str):
 
 @app.post("/add-job/high-priority", response_model=AddJobResponse)
 def add_job_as_high_priority(request: AddJobRequest):
-    return add_job_process(queue_list_name=HIGH_PRIORITY_QUEUE_LIST_NAME, request=request)
+    return add_job_process(queue_list_name=HIGH_PRIORITY_JOB_LIST_NAME, request=request)
 
 
 @app.post("/add-job/low-priority", response_model=AddJobResponse)
 def add_job_as_low_priority(request: AddJobRequest):
-    return add_job_process(queue_list_name=LOW_PRIORITY_QUEUE_LIST_NAME, request=request)
+    return add_job_process(queue_list_name=LOW_PRIORITY_JOB_LIST_NAME, request=request)
 
 
 @app.get("/get-result/{job_id}", response_model=GetResultResponse)
