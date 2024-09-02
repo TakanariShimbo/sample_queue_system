@@ -32,30 +32,30 @@ def get_result_data_key(job_id: str) -> str:
 r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
-def add_job_data_to_redis(job_id: str, job_data: dict[str, Any]) -> None:
+def add_job_data_to_pool(job_id: str, job_data: dict[str, Any]) -> None:
     job_data_key = get_job_data_key(job_id=job_id)
     r.set(job_data_key, pickle.dumps(job_data))
 
 
-def add_pre_process_job_to_redis(job_id: str) -> None:
+def add_job_id_to_pre_process_job_set(job_id: str) -> None:
     r.sadd(PRE_PROCESS_JOB_SET_NAME, job_id)
 
 
-def add_job_queue_to_redis(queue_list_name: str, job_id: str) -> None:
-    r.rpush(queue_list_name, job_id)
+def add_job_id_to_job_list(job_list_name: str, job_id: str) -> None:
+    r.rpush(job_list_name, job_id)
 
 
-def add_job_to_redis(queue_list_name: str, text: str) -> str:
+def add_job_to_redis(job_list_name: str, text: str) -> str:
     job_id = str(uuid.uuid4())
 
     job_data = {
         "text": text,
     }
-    add_job_data_to_redis(job_id=job_id, job_data=job_data)
+    add_job_data_to_pool(job_id=job_id, job_data=job_data)
 
-    add_pre_process_job_to_redis(job_id=job_id)
+    add_job_id_to_pre_process_job_set(job_id=job_id)
 
-    add_job_queue_to_redis(queue_list_name=queue_list_name, job_id=job_id)
+    add_job_id_to_job_list(job_list_name=job_list_name, job_id=job_id)
     return job_id
 
 
@@ -73,10 +73,10 @@ def get_result_data_from_redis(job_id: str) -> None:
 app = FastAPI()
 
 
-def add_job_process(queue_list_name: str, request: AddJobRequest):
+def add_job_process(job_list_name: str, request: AddJobRequest):
     response_data = []
     for request_data in request.data:
-        job_id = add_job_to_redis(queue_list_name=queue_list_name, text=request_data.text)
+        job_id = add_job_to_redis(job_list_name=job_list_name, text=request_data.text)
         response_data.append({"job_id": job_id})
     return {"data": response_data}
 
@@ -120,12 +120,12 @@ def get_result_process(job_id: str):
 
 @app.post("/add-job/high-priority", response_model=AddJobResponse)
 def add_job_as_high_priority(request: AddJobRequest):
-    return add_job_process(queue_list_name=HIGH_PRIORITY_JOB_LIST_NAME, request=request)
+    return add_job_process(job_list_name=HIGH_PRIORITY_JOB_LIST_NAME, request=request)
 
 
 @app.post("/add-job/low-priority", response_model=AddJobResponse)
 def add_job_as_low_priority(request: AddJobRequest):
-    return add_job_process(queue_list_name=LOW_PRIORITY_JOB_LIST_NAME, request=request)
+    return add_job_process(job_list_name=LOW_PRIORITY_JOB_LIST_NAME, request=request)
 
 
 @app.get("/get-result/{job_id}", response_model=GetResultResponse)

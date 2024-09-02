@@ -35,8 +35,8 @@ def _word_to_vector(job_data: dict[str, Any]) -> Any:
     return embedding
 
 
-def _get_job_from_redis(queue_list_name: str) -> tuple[str, dict[str, Any]] | None:
-    raw_job_id: bytes | None = r.lpop(queue_list_name)
+def _get_job_from_redis(job_list_name: str) -> tuple[str, dict[str, Any]] | None:
+    raw_job_id: bytes | None = r.lpop(job_list_name)
 
     if raw_job_id is None:
         return None
@@ -49,23 +49,23 @@ def _get_job_from_redis(queue_list_name: str) -> tuple[str, dict[str, Any]] | No
     return job_id, job_data
 
 
-def add_result_data_to_redis(job_id: str, result_data: dict[str, Any]) -> None:
+def add_result_data_to_pool(job_id: str, result_data: dict[str, Any]) -> None:
     result_data_key = get_result_data_key(job_id=job_id)
     r.set(result_data_key, pickle.dumps(result_data))
 
 
-def delete_job_data_from_redis(job_id: str) -> None:
+def delete_job_data_from_pool(job_id: str) -> None:
     job_data_key = get_job_data_key(job_id=job_id)
     r.delete(job_data_key)
 
 
-def delete_pre_process_job_from_redis(job_id: str) -> None:
+def delete_job_id_from_pre_process_job_set(job_id: str) -> None:
     r.srem(PRE_PROCESS_JOB_SET_NAME, job_id)
 
 
 def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
-    for queue_list_name in [HIGH_PRIORITY_JOB_LIST_NAME, LOW_PRIORITY_JOB_LIST_NAME]:
-        job = _get_job_from_redis(queue_list_name=queue_list_name)
+    for job_list_name in [HIGH_PRIORITY_JOB_LIST_NAME, LOW_PRIORITY_JOB_LIST_NAME]:
+        job = _get_job_from_redis(job_list_name=job_list_name)
         if job:
             return job
     return None
@@ -79,10 +79,10 @@ def process_job(job_id: str, job_data: dict[str, Any]) -> None:
         "embedding": embedding,
     }
 
-    add_result_data_to_redis(job_id=job_id, result_data=result_data)
+    add_result_data_to_pool(job_id=job_id, result_data=result_data)
 
-    delete_job_data_from_redis(job_id=job_id)
-    delete_pre_process_job_from_redis(job_id=job_id)
+    delete_job_data_from_pool(job_id=job_id)
+    delete_job_id_from_pre_process_job_set(job_id=job_id)
 
     return result_data
 
