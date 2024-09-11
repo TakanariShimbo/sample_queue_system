@@ -26,7 +26,9 @@ def get_result_data_key(job_id: str) -> str:
     return f"result_data:{job_id}"
 
 
-r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
+r = redis.Redis(
+    host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD
+)
 
 
 def _word_to_vector(job_data: dict[str, Any]) -> Any:
@@ -49,9 +51,13 @@ def _get_job_from_redis(job_list_name: str) -> tuple[str, dict[str, Any]] | None
     return job_id, job_data
 
 
-def add_result_data_to_pool(job_id: str, result_data: dict[str, Any]) -> None:
+def add_result_data_to_pool(
+    job_id: str,
+    result_data: dict[str, Any],
+    ttl: int = 600,
+) -> None:
     result_data_key = get_result_data_key(job_id=job_id)
-    r.set(result_data_key, pickle.dumps(result_data))
+    r.set(result_data_key, pickle.dumps(result_data), ex=ttl)
 
 
 def delete_job_data_from_pool(job_id: str) -> None:
