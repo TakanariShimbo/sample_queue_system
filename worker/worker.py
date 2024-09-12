@@ -26,15 +26,18 @@ def get_result_data_key(job_id: str) -> str:
     return f"result_data:{job_id}"
 
 
-r = redis.Redis(
-    host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD
-)
+r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
-def _word_to_vector(job_data: dict[str, Any]) -> Any:
+def _embedding_process(job_data: dict[str, Any]) -> dict[str, Any]:
     embedding = [random.uniform(0, 1) for _ in range(1024)]
+
+    result_data = {
+        "embedding": embedding,
+    }
+
     time.sleep(5)
-    return embedding
+    return result_data
 
 
 def _get_job_from_redis(job_list_name: str) -> tuple[str, dict[str, Any]] | None:
@@ -78,19 +81,13 @@ def search_job_from_redis() -> tuple[str, dict[str, Any]] | None:
 
 
 def process_job(job_id: str, job_data: dict[str, Any]) -> None:
-    embedding = _word_to_vector(job_data=job_data)
+    result_data = _embedding_process(job_data=job_data)
     print(f"Processing completed: {job_id}")
-
-    result_data = {
-        "embedding": embedding,
-    }
 
     add_result_data_to_pool(job_id=job_id, result_data=result_data)
 
     delete_job_data_from_pool(job_id=job_id)
     delete_job_id_from_pre_process_job_set(job_id=job_id)
-
-    return result_data
 
 
 if __name__ == "__main__":
