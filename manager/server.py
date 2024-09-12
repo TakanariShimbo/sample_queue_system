@@ -45,6 +45,37 @@ def add_job_id_to_job_list(job_list_name: str, job_id: str) -> None:
     r.rpush(job_list_name, job_id)
 
 
+def get_result_data_from_redis(job_id: str) -> dict[str, Any] | None:
+    result_data_key = get_result_data_key(job_id=job_id)
+    raw_result_data: Any | None = r.get(result_data_key)
+
+    if raw_result_data is None:
+        return None
+
+    return pickle.loads(raw_result_data)
+
+
+def remove_result_data_from_pool(job_id: str) -> None:
+    result_data_key = get_result_data_key(job_id=job_id)
+    r.delete(result_data_key)
+
+
+def check_n_wait(job_id: str) -> int:
+    h_idx: int | None = r.lpos(HIGH_PRIORITY_JOB_LIST_NAME, job_id)
+    if h_idx is not None:
+        return h_idx + 2
+
+    l_idx: int | None = r.lpos(LOW_PRIORITY_JOB_LIST_NAME, job_id)
+    if l_idx is not None:
+        h_length: int = r.llen(HIGH_PRIORITY_JOB_LIST_NAME)
+        return h_length + l_idx + 2
+
+    if r.sismember(PRE_PROCESS_JOB_SET_NAME, job_id):
+        return 1
+
+    return 0
+
+
 def add_job_to_redis(job_list_name: str, text: str) -> str:
     job_id = str(uuid.uuid4())
 
@@ -59,17 +90,6 @@ def add_job_to_redis(job_list_name: str, text: str) -> str:
     return job_id
 
 
-def get_result_data_from_redis(job_id: str) -> None:
-    result_data_key = get_result_data_key(job_id=job_id)
-    raw_result_data: Any | None = r.get(result_data_key)
-
-    if raw_result_data is None:
-        return None
-
-    r.delete(result_data_key)
-    return pickle.loads(raw_result_data)
-
-
 app = FastAPI()
 
 
@@ -82,35 +102,19 @@ def add_job_process(job_list_name: str, request: AddJobRequest):
 
 
 def get_result_process(job_id: str):
-    h_idx: int | None = r.lpos(HIGH_PRIORITY_JOB_LIST_NAME, job_id)
-    if h_idx is not None:
+    n_wait = check_n_wait(job_id=job_id)
+    if n_wait > 0:
         return JSONResponse(
             status_code=202,
             content={
-                "data": {"n_wait": h_idx + 1},
-            },
-        )
-
-    l_idx: int | None = r.lpos(LOW_PRIORITY_JOB_LIST_NAME, job_id)
-    if l_idx is not None:
-        h_length: int = r.llen(HIGH_PRIORITY_JOB_LIST_NAME)
-        return JSONResponse(
-            status_code=202,
-            content={
-                "data": {"n_wait": h_length + l_idx + 1},
-            },
-        )
-
-    if r.sismember(PRE_PROCESS_JOB_SET_NAME, job_id):
-        return JSONResponse(
-            status_code=202,
-            content={
-                "data": {"n_wait": 0},
+                "data": {"n_wait": n_wait},
             },
         )
 
     result = get_result_data_from_redis(job_id=job_id)
     if result:
+        remove_result_data_from_pool(job_id=job_id)
+
         return {
             "data": {"embedding": result["embedding"]},
         }
