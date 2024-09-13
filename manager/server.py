@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 import redis
 
-from scheme import AddJobRequest, AddJobResponse, GetResultResponse
+from scheme import AddJobRequest, AddJobResponse, GetResultResponse, AddJobRequestData
 
 
 load_dotenv()
@@ -32,9 +32,9 @@ def get_result_data_key(job_id: str) -> str:
 r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
 
 
-def add_job_data_to_pool(job_id: str, job_data: dict[str, Any]) -> None:
+def add_job_data_to_pool(job_id: str, job_data_dict: dict[str, Any]) -> None:
     job_data_key = get_job_data_key(job_id=job_id)
-    r.set(job_data_key, pickle.dumps(job_data))
+    r.set(job_data_key, pickle.dumps(job_data_dict))
 
 
 def add_job_id_to_pre_process_job_set(job_id: str) -> None:
@@ -63,26 +63,24 @@ def remove_result_data_from_pool(job_id: str) -> None:
 def check_n_wait(job_id: str) -> int:
     h_idx: int | None = r.lpos(HIGH_PRIORITY_JOB_LIST_NAME, job_id)
     if h_idx is not None:
-        return h_idx + 2
+        return h_idx + 1
 
     l_idx: int | None = r.lpos(LOW_PRIORITY_JOB_LIST_NAME, job_id)
     if l_idx is not None:
         h_length: int = r.llen(HIGH_PRIORITY_JOB_LIST_NAME)
-        return h_length + l_idx + 2
+        return h_length + l_idx + 1
 
     if r.sismember(PRE_PROCESS_JOB_SET_NAME, job_id):
-        return 1
+        return 0
 
-    return 0
+    return -1
 
 
-def add_job_to_redis(job_list_name: str, text: str) -> str:
+def add_job_to_redis(job_list_name: str, job_data: AddJobRequestData) -> str:
     job_id = str(uuid.uuid4())
 
-    job_data = {
-        "text": text,
-    }
-    add_job_data_to_pool(job_id=job_id, job_data=job_data)
+    job_data_dict = job_data.model_dump()
+    add_job_data_to_pool(job_id=job_id, job_data_dict=job_data_dict)
 
     add_job_id_to_pre_process_job_set(job_id=job_id)
 
@@ -95,15 +93,15 @@ app = FastAPI()
 
 def add_job_process(job_list_name: str, request: AddJobRequest):
     response_data = []
-    for request_data in request.data:
-        job_id = add_job_to_redis(job_list_name=job_list_name, text=request_data.text)
+    for job_data in request.data:
+        job_id = add_job_to_redis(job_list_name=job_list_name, job_data=job_data)
         response_data.append({"job_id": job_id})
     return {"data": response_data}
 
 
 def get_result_process(job_id: str):
     n_wait = check_n_wait(job_id=job_id)
-    if n_wait > 0:
+    if n_wait >= 0:
         return JSONResponse(
             status_code=202,
             content={
