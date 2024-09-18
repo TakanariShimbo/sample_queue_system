@@ -57,10 +57,10 @@ def _get_job_from_redis(job_list_name: str) -> tuple[str, dict[str, Any]] | None
 def add_result_data_to_pool(
     job_id: str,
     result_data: dict[str, Any],
-    ttl: int = 600,
+    expiration_sec: int,
 ) -> None:
     result_data_key = get_result_data_key(job_id=job_id)
-    r.set(result_data_key, pickle.dumps(result_data), ex=ttl)
+    r.set(result_data_key, pickle.dumps(result_data), ex=expiration_sec)
 
 
 def delete_job_data_from_pool(job_id: str) -> None:
@@ -84,7 +84,8 @@ def process_job(job_id: str, job_data: dict[str, Any]) -> None:
     result_data = _embedding_process(job_data=job_data)
     print(f"Processing completed: {job_id}")
 
-    add_result_data_to_pool(job_id=job_id, result_data=result_data)
+    expiration_sec: int = job_data["expiration_sec"]
+    add_result_data_to_pool(job_id=job_id, result_data=result_data, expiration_sec=expiration_sec)
 
     delete_job_data_from_pool(job_id=job_id)
     delete_job_id_from_pre_process_job_set(job_id=job_id)

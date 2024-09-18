@@ -61,19 +61,23 @@ def remove_result_data_from_pool(job_id: str) -> None:
 
 
 def check_n_wait(job_id: str) -> int:
-    h_idx: int | None = r.lpos(HIGH_PRIORITY_JOB_LIST_NAME, job_id)
-    if h_idx is not None:
-        return h_idx + 1
+    if not r.sismember(PRE_PROCESS_JOB_SET_NAME, job_id):
+        # already processed or not found
+        return -1
 
-    l_idx: int | None = r.lpos(LOW_PRIORITY_JOB_LIST_NAME, job_id)
-    if l_idx is not None:
-        h_length: int = r.llen(HIGH_PRIORITY_JOB_LIST_NAME)
-        return h_length + l_idx + 1
+    high_priority_idx: int | None = r.lpos(HIGH_PRIORITY_JOB_LIST_NAME, job_id)
+    if high_priority_idx is not None:
+        # exist at high priority job list
+        return high_priority_idx + 1
 
-    if r.sismember(PRE_PROCESS_JOB_SET_NAME, job_id):
-        return 0
+    low_priority_idx: int | None = r.lpos(LOW_PRIORITY_JOB_LIST_NAME, job_id)
+    if low_priority_idx is not None:
+        # exist at low priority job list
+        high_priority_length: int = r.llen(HIGH_PRIORITY_JOB_LIST_NAME)
+        return high_priority_length + low_priority_idx + 1
 
-    return -1
+    # processing now
+    return 0
 
 
 def add_job_to_redis(job_list_name: str, job_data: AddJobRequestData) -> str:

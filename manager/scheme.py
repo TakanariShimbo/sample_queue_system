@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 class AddJobRequestData(BaseModel):
     text: str
+    expiration_sec: int = 60 * 60 * 24
 
 
 class AddJobRequest(BaseModel):
