@@ -6,8 +6,7 @@ from typing import Literal
 import requests
 
 
-API_SERVER_ADDRESS = "localhost"
-API_SERVER_PORT = "8000"
+API_SERVER_ENDPOINT = "http://localhost:8000"
 
 
 def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
@@ -16,7 +15,7 @@ def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
         data.append({"text": text})
 
     response = requests.post(
-        url=f"http://{API_SERVER_ADDRESS}:{API_SERVER_PORT}/add-job/{priority}-priority",
+        url=f"{API_SERVER_ENDPOINT}/add-job/{priority}-priority",
         json={"data": data},
     )
 
@@ -34,7 +33,7 @@ def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
 
 def request_result(job_id: str):
     response = requests.get(
-        url=f"http://{API_SERVER_ADDRESS}:{API_SERVER_PORT}/get-result/{job_id}",
+        url=f"{API_SERVER_ENDPOINT}/get-result/{job_id}",
     )
 
     body = response.json()
