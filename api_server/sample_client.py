@@ -3,13 +3,11 @@ import time
 import threading
 from typing import Literal
 
-from dotenv import load_dotenv
 import requests
 
 
-load_dotenv()
-MANAGER_IP_ADDRESS = os.environ["MANAGER_IP_ADDRESS"]
-MANAGER_PORT = os.environ["MANAGER_PORT"]
+API_SERVER_ADDRESS = "localhost"
+API_SERVER_PORT = "8000"
 
 
 def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
@@ -18,7 +16,7 @@ def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
         data.append({"text": text})
 
     response = requests.post(
-        url=f"http://{MANAGER_IP_ADDRESS}:{MANAGER_PORT}/add-job/{priority}-priority",
+        url=f"http://{API_SERVER_ADDRESS}:{API_SERVER_PORT}/add-job/{priority}-priority",
         json={"data": data},
     )
 
@@ -36,7 +34,7 @@ def submit_job(texts: list[str], priority: Literal["high", "low"]) -> list[str]:
 
 def request_result(job_id: str):
     response = requests.get(
-        url=f"http://{MANAGER_IP_ADDRESS}:{MANAGER_PORT}/get-result/{job_id}",
+        url=f"http://{API_SERVER_ADDRESS}:{API_SERVER_PORT}/get-result/{job_id}",
     )
 
     body = response.json()
