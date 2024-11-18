@@ -3,7 +3,6 @@ import uuid
 import pickle
 from typing import Any
 
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 import redis
@@ -11,11 +10,13 @@ import redis
 from scheme import AddJobRequest, AddJobResponse, GetResultResponse, AddJobRequestData
 
 
-load_dotenv()
-REDIS_IP_ADDRESS = os.environ["REDIS_IP_ADDRESS"]
-REDIS_PORT = os.environ["REDIS_PORT"]
-REDIS_PASSWORD = os.environ["REDIS_PASSWORD"]
+# load environment variables
+CACHE_SERVER_ADDRESS = os.environ["CACHE_SERVER_ADDRESS"]
+CACHE_SERVER_PORT = os.environ["CACHE_SERVER_PORT"]
+CACHE_SERVER_PASSWORD = os.environ["CACHE_SERVER_PASSWORD"]
 
+
+# redis keys
 HIGH_PRIORITY_JOB_LIST_NAME = "high_priority_job_list"
 LOW_PRIORITY_JOB_LIST_NAME = "low_priority_job_list"
 PRE_PROCESS_JOB_SET_NAME = "pre_process_job_set"
@@ -29,7 +30,7 @@ def get_result_data_key(job_id: str) -> str:
     return f"result_data:{job_id}"
 
 
-r = redis.Redis(host=REDIS_IP_ADDRESS, port=int(REDIS_PORT), db=0, password=REDIS_PASSWORD)
+r = redis.Redis(host=CACHE_SERVER_ADDRESS, port=int(CACHE_SERVER_PORT), db=0, password=CACHE_SERVER_PASSWORD)
 
 
 def add_job_data_to_pool(job_id: str, job_data_dict: dict[str, Any]) -> None:

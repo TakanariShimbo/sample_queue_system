@@ -7,9 +7,9 @@ Sample Queue System
 2. Build docker image
 
 ```bash
-# build manager
-cd ./manager
-docker build -t queue-system-manager .
+# build api server
+cd ./api_server
+docker build -t queue-system-api-server .
 
 # build worker
 cd ./worker
@@ -32,33 +32,33 @@ conda activate queue_system_client
 5. Run sample_client.py
 
 ```bash
-cd ./manager
+cd ./api_server
 python ./sample_client.py
 ```
 
-6. Check and debug queue system on redis insight
+6. Check monitor of cache server
 
 - Access the following url
 
 ```url
-# REDIS-PORT: on your env
-http://localhost:REDIS-PORT/
+# CACHE-SERVER-MONITOR-PORT: set at .env
+http://localhost:CACHE-SERVER-MONITOR-PORT/
 ```
 
 - Click [Add Redis database]
 - Enter the following items
 
 ```
-Host: redis-container
+Host: cache-server-container
 Database Alias: Your optional name
 Username: default
-Password: Your .env setting
+Password: CACHE_SERVER_PASSWORD set at .env
 ```
 
 ## Sequence Diagram
 
-![sequence_diagram](./sequence_diagram.svg)
+![sequence_diagram](./readme/sequence_diagram.svg)
 
 ## System Diagram
 
-![system_diagram](./system_diagram.jpg)
+![system_diagram](./readme/system_diagram.jpg)
