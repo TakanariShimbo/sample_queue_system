@@ -21,6 +21,8 @@ services:
     image: queue-system-api-server
     ports:
       - "${API_SERVER_PORT}:8000"
+    volumes:
+      - ./api_server:/work
     environment:
       - CACHE_SERVER_ADDRESS=cache-server-container
       - CACHE_SERVER_PORT=6379
@@ -33,6 +35,8 @@ services:
   worker-service:
     container_name: worker-container
     image: queue-system-worker
+    volumes:
+      - ./worker:/work
     environment:
       - CACHE_SERVER_ADDRESS=cache-server-container
       - CACHE_SERVER_PORT=6379

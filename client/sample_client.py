@@ -38,7 +38,7 @@ def request_result(job_id: str):
 
     body = response.json()
     if response.status_code == 200:
-        print(f"{job_id}: Finish")
+        print(f"{job_id}: Finish, result is {body['data']['embedding']}")
         return body["data"]["embedding"]
     elif response.status_code == 202:
         n_wait = body["data"]["n_wait"]

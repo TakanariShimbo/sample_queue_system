@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /work
 
-COPY . /work
+COPY ./requirements.txt /work
 
 RUN apt-get clean && apt-get update
 RUN apt-get upgrade -y --fix-missing
