@@ -11,14 +11,14 @@ cache_client = CacheClient()
 app = FastAPI()
 
 
-def add_job_process(job_priority: Literal["high-priority", "low-priority"], request: AddJobRequest) -> dict[str, Any]:
+def add_job_process(priority: Literal["high", "low"], request: AddJobRequest) -> dict[str, Any]:
     response_data = []
     for job_data in request.data:
         job_data_dict = job_data.model_dump()
 
-        if job_priority == "high-priority":
+        if priority == "high":
             job_id = cache_client.add_high_priority_job(job_data_dict=job_data_dict)
-        elif job_priority == "low-priority":
+        elif priority == "low":
             job_id = cache_client.add_low_priority_job(job_data_dict=job_data_dict)
 
         response_data.append({"job_id": job_id})
@@ -46,12 +46,12 @@ def get_result_process(job_id: str) -> JSONResponse | dict[str, Any]:
 
 @app.post(path="/add-job/high-priority", response_model=AddJobResponse)
 def add_job_as_high_priority(request: AddJobRequest):
-    return add_job_process(job_priority="high-priority", request=request)
+    return add_job_process(priority="high", request=request)
 
 
 @app.post(path="/add-job/low-priority", response_model=AddJobResponse)
 def add_job_as_low_priority(request: AddJobRequest):
-    return add_job_process(job_priority="low-priority", request=request)
+    return add_job_process(priority="low", request=request)
 
 
 @app.get(path="/get-result/{job_id}", response_model=GetResultResponse)
