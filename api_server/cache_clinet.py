@@ -1,7 +1,7 @@
 import os
 import uuid
 import pickle
-from typing import Any
+from typing import Any, Literal
 
 import redis
 
@@ -30,37 +30,58 @@ class CacheClient:
 
     def _add_job_data_to_pool(self, job_id: str, job_data_dict: dict[str, Any]) -> None:
         job_data_key = get_job_data_key(job_id=job_id)
-        self._client.set(job_data_key, pickle.dumps(job_data_dict))
-
-    def _add_job_id_to_pre_process_job_set(self, job_id: str) -> None:
-        self._client.sadd(PRE_PROCESS_JOB_SET_NAME, job_id)
-
-    def _add_job_id_to_job_list(self, job_list_name: str, job_id: str) -> None:
-        self._client.rpush(job_list_name, job_id)
+        self._client.set(name=job_data_key, value=pickle.dumps(job_data_dict))
 
     def _get_result_data_from_pool(self, job_id: str) -> dict[str, Any] | None:
         result_data_key = get_result_data_key(job_id=job_id)
-        raw_result_data: Any | None = self._client.get(result_data_key)
+        raw_result_data: Any | None = self._client.get(name=result_data_key)
 
         if raw_result_data is None:
             return None
 
         return pickle.loads(raw_result_data)
 
-    def _remove_result_data_from_pool(self, job_id: str) -> None:
+    def _remove_result_data_from_pool(self, job_id: str) -> bool:
         result_data_key = get_result_data_key(job_id=job_id)
-        self._client.delete(result_data_key)
+        n_removed = self._client.delete(result_data_key)
+        if n_removed == 0:
+            return False
+        return True
+
+    def _add_job_id_to_pre_process_job_set(self, job_id: str) -> None:
+        self._client.sadd(PRE_PROCESS_JOB_SET_NAME, job_id)
+
+    def _check_job_id_in_pre_process_job_set(self, job_id: str) -> bool:
+        return self._client.sismember(name=PRE_PROCESS_JOB_SET_NAME, value=job_id)
+
+    def _remove_job_id_from_pre_process_job_set(self, job_id: str) -> bool:
+        n_removed = self._client.srem(PRE_PROCESS_JOB_SET_NAME, job_id)
+        if n_removed == 0:
+            return False
+        return True
+
+    def _add_job_id_to_job_list(self, job_list_name: str, job_id: str) -> None:
+        self._client.rpush(job_list_name, job_id)
+
+    def _remove_job_id_from_job_list(self, job_id: str) -> bool:
+        n_removed_high = self._client.lrem(name=HIGH_PRIORITY_JOB_LIST_NAME, count=1, value=job_id)
+        if n_removed_high != 0:
+            return True
+
+        n_removed_low = self._client.lrem(name=LOW_PRIORITY_JOB_LIST_NAME, count=1, value=job_id)
+        if n_removed_low != 0:
+            return True
+
+        return False
 
     def _check_idx_in_job_list(self, job_list_name: str, job_id: str) -> int | None:
-        idx: int | None = self._client.lpos(job_list_name, job_id)
+        idx: int | None = self._client.lpos(name=job_list_name, value=job_id)
         if idx is None:
             return None
         return idx
 
     def _check_length_of_job_list(self, job_list_name: str) -> int:
-        length: int | None = self._client.llen(job_list_name)
-        if length is None:
-            return 0
+        length = self._client.llen(name=job_list_name)
         return length
 
     def _add_job(self, job_list_name: str, job_data_dict: dict[str, Any]) -> str:
@@ -80,7 +101,7 @@ class CacheClient:
         return self._add_job(job_list_name=LOW_PRIORITY_JOB_LIST_NAME, job_data_dict=job_data_dict)
 
     def check_n_wait(self, job_id: str) -> int:
-        if not self._client.sismember(PRE_PROCESS_JOB_SET_NAME, job_id):
+        if not self._check_job_id_in_pre_process_job_set(job_id=job_id):
             # already processed or not found
             return -1
 
@@ -98,10 +119,23 @@ class CacheClient:
         # processing now
         return 0
 
+    def cancel_job(self, job_id: str) -> tuple[bool, Literal["canceled", "processing", "not found"]]:
+        if not self._check_job_id_in_pre_process_job_set(job_id=job_id):
+            return False, "not found"
+
+        if not self._remove_job_id_from_job_list(job_id=job_id):
+            return False, "processing"
+
+        self._remove_job_id_from_pre_process_job_set(job_id=job_id)
+        self._remove_result_data_from_pool(job_id=job_id)
+        return True, "canceled"
+
     def get_result_data(self, job_id: str) -> dict[str, Any] | None:
         result_data = self._get_result_data_from_pool(job_id=job_id)
         if result_data is None:
             return None
 
-        self._remove_result_data_from_pool(job_id=job_id)
         return result_data
+
+    def remove_result_data(self, job_id: str) -> bool:
+        return self._remove_result_data_from_pool(job_id=job_id)
